@@ -1,0 +1,50 @@
+{
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-05-25T04:34:00Z",
+    "name": "6pinochle Scorecard",
+    "author": "antigravity@google.com",
+    "description": "A modern, highly polished, glassmorphic scorecard tracker for 6-player (triple deck) and 4-player (double deck) Pinochle tournaments.",
+    "features": null,
+    "docker_images": {
+        "Golang 1.21 (Debian)": "ghcr.io/pterodactyl/yolks:debian",
+        "Golang 1.21 (Alpine)": "ghcr.io/pterodactyl/yolks:alpine"
+    },
+    "file_denylist": [],
+    "startup": "./server",
+    "config": {
+        "files": "{}",
+        "startup": "{\n    \"done\": \"Server listening on http\"\n}",
+        "logs": "{}",
+        "stop": "^^C"
+    },
+    "variables": [
+        {
+            "name": "Server Port",
+            "description": "The port that the Go scorecard server binds to.",
+            "env_variable": "PORT",
+            "default_value": "8080",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|between:1,65535"
+        },
+        {
+            "name": "Git Repository",
+            "description": "The Git repository URL containing the Go scorecard code to compile if no prebuilt server binary is uploaded.",
+            "env_variable": "GIT_REPO",
+            "default_value": "https://github.com/dae/6pinochle",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string"
+        }
+    ],
+    "scripts": {
+        "installation": {
+            "container": "ghcr.io/pterodactyl/yolks:go_1.21",
+            "entrypoint": "bash",
+            "script": "#!/bin/bash\n# 6pinochle Pterodactyl Installation Script\n\necho \"=========================================\"\necho \"Installing 6pinochle Scorecard...\"\necho \"=========================================\"\n\n# Update package repositories and install git\nif [ -f \"/usr/bin/apt-get\" ]; then\n    apt-get update -y\n    apt-get install -y git curl ca-certificates\nelif [ -f \"/sbin/apk\" ]; then\n    apk update\n    apk add git curl ca-certificates\nfi\n\ncd /mnt/server\n\n# Check if binary already exists\nif [ -f \"server\" ]; then\n    echo \"Precompiled 'server' binary detected. Skipping build.\"\n    exit 0\nfi\n\n# Clone repository and compile\nif [ -z \"${GIT_REPO}\" ]; then\n    echo \"WARNING: No GIT_REPO specified and no pre-built 'server' binary found.\"\n    echo \"Please upload a precompiled 'server' binary to your server files after creation.\"\n    exit 0\nfi\n\necho \"Cloning repository from: ${GIT_REPO}\"\n# Clone into a temp directory\nrm -rf temp_src\ngit clone \"${GIT_REPO}\" temp_src\n\nif [ ! -d \"temp_src\" ]; then\n    echo \"ERROR: Failed to clone git repository.\"\n    exit 1\nfi\n\ncd temp_src\n\n# Build Go application\necho \"Building Go scorecard server...\"\nCGO_ENABLED=0 go build -ldflags=\"-w -s\" -o ../server .\n\ncd ..\nrm -rf temp_src\n\nif [ -f \"server\" ]; then\n    echo \"=========================================\"\n    echo \"Build successful! Ready to run.\"\n    echo \"=========================================\"\nelse\n    echo \"ERROR: Compilation failed. Binary not created.\"\n    exit 1\nfi"
+        }
+    }
+}

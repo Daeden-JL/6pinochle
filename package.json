@@ -1,0 +1,14 @@
+{
+  "name": "pinochle-scorecard",
+  "version": "1.0.0",
+  "description": "6-Player Pinochle Scorecard Application",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^5.7.0",
+    "@capacitor/cli": "^5.7.0",
+    "@capacitor/core": "^5.7.0"
+  }
+}

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pinochle-tracker:latest
+    container_name: pinochle-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./games_history.yaml:/app/games_history.yaml
+    environment:
+      - PORT=8080
+    restart: unless-stopped

@@ -1,0 +1,10 @@
+node_modules/
+.antigravitycli/
+pinochle
+pinochle-app
+active_games.json
+games_history.yaml
+.gemini/
+android/app/build/
+android/.gradle/
+android/local.properties
