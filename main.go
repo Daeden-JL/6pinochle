@@ -20,6 +20,7 @@ import (
 var templateFS embed.FS
 
 const HistoryFileName = "games_history.yaml"
+const LatestAndroidVersion = "1.0.1"
 
 // --- Online Multiplayer & Card Play Engine Structs ---
 
@@ -2738,6 +2739,8 @@ func main() {
 	http.HandleFunc("/api/host-settings", handleHostSettings)
 	http.HandleFunc("/api/online-state", handleOnlineState)
 	http.HandleFunc("/api/acknowledge-meld", handleAcknowledgeMeld)
+	http.HandleFunc("/api/android-version", handleAndroidVersionCheck)
+	http.HandleFunc("/android/app-debug.apk", handleAndroidApkDownload)
 
 	// Get port from environment or default to 8080
 	port := os.Getenv("PORT")
@@ -3070,3 +3073,19 @@ func GetMeldCards(hand []Card, trumpSuit string, isNumberTheme bool) []Card {
 
 	return meldCards
 }
+
+func handleAndroidVersionCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(map[string]string{
+		"version":     LatestAndroidVersion,
+		"downloadUrl": "https://pinochle.bedrock.games/android/app-debug.apk",
+	})
+}
+
+func handleAndroidApkDownload(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/vnd.android.package-archive")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"6pinochle-update.apk\"")
+	http.ServeFile(w, r, "android/app/build/outputs/apk/debug/app-debug.apk")
+}
+

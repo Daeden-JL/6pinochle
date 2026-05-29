@@ -557,6 +557,7 @@
 
         <!-- Multiplayer Lobby View -->
         <section id="multiplayer-lobby-view" class="hidden space-y-8">
+            <div id="android-online-status-banner" class="hidden rounded-2xl p-4 border border-violet-500/20 bg-violet-500/5 text-violet-300 text-xs text-center font-bold"></div>
             <div class="glass-card rounded-3xl p-6 sm:p-8 relative glow-violet overflow-hidden">
                 <div class="absolute -right-10 -top-10 w-40 h-40 bg-violet-600/10 rounded-full blur-3xl"></div>
                 <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -951,6 +952,40 @@
             <p>Score scale divided by 10. Trick points sum validates to 75 points per round.</p>
         </div>
     </footer>
+
+    <!-- Android Update Modal -->
+    <div id="android-update-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card max-w-md w-full rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative border border-slate-800 glow-violet text-center">
+            <div class="mx-auto h-12 w-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 mb-4">
+                <svg class="h-6 w-6 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+            </div>
+            <h3 class="text-2xl font-extrabold text-white tracking-tight">Update Required</h3>
+            <p class="text-xs text-slate-400">An update is available for the 6-player Pinochle app. Please download the latest version to connect online and join multiplayer tables.</p>
+            
+            <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 flex items-center justify-around text-xs">
+                <div>
+                    <span class="text-[9px] text-slate-500 font-extrabold uppercase block">Your Version</span>
+                    <span class="font-bold text-red-400" id="local-app-version">1.0.0</span>
+                </div>
+                <div class="h-6 w-px bg-slate-800"></div>
+                <div>
+                    <span class="text-[9px] text-slate-500 font-extrabold uppercase block">Latest Version</span>
+                    <span class="font-bold text-emerald-400" id="server-app-version">1.0.1</span>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <button onclick="downloadLatestAndroidApk()" class="w-full py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-2xl text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-violet-500/20">
+                    Download & Install Update
+                </button>
+                <button onclick="dismissUpdateModal()" class="w-full py-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-2xl text-xs font-semibold cursor-pointer">
+                    Continue Offline (Scorecard Only)
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- 3. START GAME MODAL DIALOG (Glassmorphism backdrop) -->
     <div id="new-game-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity duration-300">
@@ -1352,6 +1387,9 @@
         let selectedLobbyTheme = 'classic'; // 'classic' or 'number'
         let autoPlayMode = true; // Click plays card immediately
         let selectedPlayCard = null; // Highlighted card in Click-Confirm mode
+        const ANDROID_APP_VERSION = "1.0.1";
+        const isCapacitorAndroid = !!window.Capacitor;
+        let isAndroidMultiplayerUnlocked = true;
         let activeOnlineSessionID = localStorage.getItem('activeOnlineSessionID') || '';
         let currentOnlineGame = null;
         let onlinePollInterval = null;
@@ -1420,6 +1458,30 @@
                     renderDashboard();
                 }
             } else {
+                if (isCapacitorAndroid && !isAndroidMultiplayerUnlocked) {
+                    fetch('https://pinochle.bedrock.games/api/android-version')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.version !== ANDROID_APP_VERSION) {
+                            showAndroidUpdateModal(ANDROID_APP_VERSION, data.version);
+                        } else {
+                            showError("Multiplayer locked: Game server check failed. Check your internet connection.");
+                        }
+                    })
+                    .catch(() => {
+                        showError("Multiplayer locked: Game server check failed. Check your internet connection.");
+                    });
+                    
+                    tabScorecard.className = 'py-1.5 px-3 rounded-xl text-[11px] font-bold transition-all bg-violet-600 text-white shadow-md shadow-violet-600/10 cursor-pointer';
+                    tabMultiplayer.className = 'py-1.5 px-3 rounded-xl text-[11px] font-bold transition-all bg-transparent text-slate-400 hover:text-white cursor-pointer';
+                    if (appState.activeGame) {
+                        activeGameView.classList.remove('hidden');
+                    } else {
+                        dashboardView.classList.remove('hidden');
+                    }
+                    return;
+                }
+
                 tabMultiplayer.className = 'py-1.5 px-3 rounded-xl text-[11px] font-bold transition-all bg-violet-600 text-white shadow-md shadow-violet-600/10 cursor-pointer';
                 
                 myPlayerName = localStorage.getItem('pinochleUsername') || '';
@@ -3961,9 +4023,68 @@
             });
         }
 
+        function checkAndroidAppVersionOnline() {
+            fetch('https://pinochle.bedrock.games/api/android-version')
+            .then(res => {
+                if (!res.ok) throw new Error("Server response not ok");
+                return res.json();
+            })
+            .then(data => {
+                const serverVersion = data.version;
+                if (serverVersion !== ANDROID_APP_VERSION) {
+                    isAndroidMultiplayerUnlocked = false;
+                    showAndroidUpdateModal(ANDROID_APP_VERSION, serverVersion);
+                } else {
+                    isAndroidMultiplayerUnlocked = true;
+                    showOnlineIndicator("Multiplayer Connection Enabled");
+                }
+            })
+            .catch(err => {
+                console.warn("Android client is offline or cannot connect to server:", err);
+                isAndroidMultiplayerUnlocked = false;
+                showOnlineIndicator("Offline Mode - Connect to server to check for updates");
+            });
+        }
+
+        function showAndroidUpdateModal(localVer, serverVer) {
+            const modal = document.getElementById('android-update-modal');
+            if (modal) {
+                document.getElementById('local-app-version').innerText = localVer;
+                document.getElementById('server-app-version').innerText = serverVer;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function downloadLatestAndroidApk() {
+            window.open('https://pinochle.bedrock.games/android/app-debug.apk', '_system');
+        }
+
+        function dismissUpdateModal() {
+            const modal = document.getElementById('android-update-modal');
+            if (modal) {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+            }
+            switchMainTab('scorecard');
+        }
+
+        function showOnlineIndicator(msg) {
+            const banner = document.getElementById('android-online-status-banner');
+            if (banner) {
+                banner.innerText = msg;
+                banner.classList.remove('hidden');
+            }
+        }
+
         // --- STARTUP LOGIC SYNC ---
         window.addEventListener('DOMContentLoaded', () => {
             renderLobbyTeamInputs();
+            
+            if (isCapacitorAndroid) {
+                checkAndroidAppVersionOnline();
+            }
+
             // URL join check
             const params = new URLSearchParams(window.location.search);
             const joinCode = params.get('join');
