@@ -3019,12 +3019,7 @@
                 lastRenderedTrickPlayers = [];
             }
 
-            // South Seat (User) Identification
-            let mySeat = -1;
-            game.players.forEach((p, idx) => {
-                if (p.name === myPlayerName) mySeat = idx;
-            });
-            const isObserver = (mySeat === -1);
+
 
             // Trigger dealing animation check
             if (!isObserver && ['bidding', 'meld', 'meld_show', 'playing'].includes(game.status) && game.players[mySeat] && game.players[mySeat].hand && game.players[mySeat].hand.length > 0) {
