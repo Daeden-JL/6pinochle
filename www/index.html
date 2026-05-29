@@ -1882,6 +1882,7 @@
             suits.forEach(s => {
                 const isValid = hasMarriageJS(myHand, s, isNumberTheme);
                 const isSelected = activeTrumpSelection === s;
+                const meldVal = calculateMeldJS(myHand, s, isNumberTheme);
                 
                 let style = '';
                 let disabledAttr = '';
@@ -1899,8 +1900,13 @@
                 let colorCl = isValid ? getSuitColorClassJS(s, isNumberTheme) : 'text-slate-650';
                 
                 grid.innerHTML += `
-                    <button ${disabledAttr} onclick="setDeclareTrumpSelection('${s}')" class="py-3 px-4 border rounded-xl text-xs font-bold transition-all cursor-pointer ${style}">
-                        <span class="${colorCl} mr-1">${symbol}</span> ${s}
+                    <button ${disabledAttr} onclick="setDeclareTrumpSelection('${s}')" class="py-3.5 px-4 border rounded-xl text-xs font-bold transition-all cursor-pointer ${style} flex flex-col items-center justify-center gap-1 min-h-[64px]">
+                        <div class="flex items-center">
+                            <span class="${colorCl} mr-1.5">${symbol}</span> ${s}
+                        </div>
+                        <div class="text-[10px] font-semibold opacity-85 mt-0.5">
+                            ${isValid ? `Meld: <span class="font-extrabold">${meldVal}</span>` : 'No Marriage'}
+                        </div>
                     </button>
                 `;
             });
@@ -3593,7 +3599,7 @@
             }, 550);
         }
 
-        function spawnFlyingCardToHand(tabletop, handRow, card, onComplete) {
+        function spawnFlyingCardToHand(tabletop, handRow, card, isNumberTheme, onComplete) {
             const tableRect = tabletop.getBoundingClientRect();
             const handRect = handRow.getBoundingClientRect();
             
@@ -3603,28 +3609,62 @@
             const toY = handRect.top + handRect.height / 2;
             
             const flyer = document.createElement('div');
-            flyer.className = 'fixed bg-gradient-to-br from-indigo-900 to-slate-950 border border-violet-500/40 rounded-xl shadow-2xl flex items-center justify-center select-none z-50 pointer-events-none transition-all duration-450 ease-out';
+            flyer.className = 'fixed select-none z-50 pointer-events-none transition-all duration-400 ease-out';
             flyer.style.width = '56px';
             flyer.style.height = '88px';
             flyer.style.left = `${fromX - 28}px`;
             flyer.style.top = `${fromY - 44}px`;
-            flyer.style.transform = 'scale(0.2) rotate(0deg)';
+            flyer.style.perspective = '1000px';
+            flyer.style.transformStyle = 'preserve-3d';
+            flyer.style.transform = 'scale(0.2)';
             flyer.style.opacity = '0.5';
-            flyer.innerHTML = `<span class="text-[8px] text-violet-400 font-extrabold font-mono select-none">P</span>`;
+            
+            flyer.innerHTML = `
+                <div class="flyer-inner absolute inset-0 rounded-xl transition-all duration-300" style="transform-style: preserve-3d; width: 100%; height: 100%; transform: rotateY(180deg);">
+                    <!-- Front Face (Actual Card Face) -->
+                    <div class="absolute inset-0 bg-slate-900 rounded-xl flex flex-col justify-between p-2 shadow-lg shadow-black/30" style="backface-visibility: hidden; transform-style: preserve-3d; border: 1px solid #1e293b;">
+                        <span class="text-xs font-extrabold text-slate-100 select-none">${card.rank}</span>
+                        ${getCardFaceHTML(card.rank, card.suit, isNumberTheme)}
+                        <span class="text-xs font-extrabold text-slate-100 select-none text-right rotate-180">${card.rank}</span>
+                    </div>
+                    <!-- Back Face (Facedown Card) -->
+                    <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 to-slate-950 border border-violet-500/40 rounded-xl shadow-lg flex items-center justify-center select-none" style="backface-visibility: hidden; transform: rotateY(180deg); transform-style: preserve-3d;">
+                        <span class="text-[8px] text-violet-400 font-extrabold font-mono select-none">P</span>
+                    </div>
+                </div>
+            `;
             
             document.body.appendChild(flyer);
             
             flyer.offsetHeight;
             
-            flyer.style.transform = `translate(${toX - fromX}px, ${toY - fromY}px) scale(1) rotate(360deg)`;
+            // Phase 1: Fly to pause point (just above the hand drawer) and scale up
+            const pauseX = toX;
+            const pauseY = toY - 60;
+            flyer.style.transform = `translate(${pauseX - fromX}px, ${pauseY - fromY}px) scale(1.15)`;
             flyer.style.opacity = '1';
             
             setTimeout(() => {
-                if (flyer.parentNode) {
-                    flyer.parentNode.removeChild(flyer);
+                // Phase 2: Pause and Flip over to face-up
+                const inner = flyer.querySelector('.flyer-inner');
+                if (inner) {
+                    inner.style.transform = 'rotateY(0deg)';
                 }
-                if (onComplete) onComplete();
-            }, 450);
+                
+                setTimeout(() => {
+                    // Phase 3: Fly and slide into final hand deck position
+                    flyer.style.transition = 'transform 0.3s cubic-bezier(0.55, 0.055, 0.675, 0.19), opacity 0.3s';
+                    flyer.style.transform = `translate(${toX - fromX}px, ${toY - fromY}px) scale(0.9)`;
+                    flyer.style.opacity = '0.8';
+                    
+                    setTimeout(() => {
+                        if (flyer.parentNode) {
+                            flyer.parentNode.removeChild(flyer);
+                        }
+                        if (onComplete) onComplete();
+                    }, 300);
+                }, 500); // 500ms pause to let the user see the card flip and reveal
+            }, 400);
         }
 
         function sortHandCardsJS(hand, isNumberTheme) {
@@ -3722,7 +3762,7 @@
                 }
                 
                 if (feltTabletop && handRow) {
-                    spawnFlyingCardToHand(feltTabletop, handRow, card, () => {
+                    spawnFlyingCardToHand(feltTabletop, handRow, card, game.deckTheme === 'number', () => {
                         onlineDealingDealtCards.push(card);
                         sortHandCardsJS(onlineDealingDealtCards, game.deckTheme === 'number');
                         onlineDealingNewCardKey = `${card.suit}_${card.rank}`;
@@ -3891,7 +3931,7 @@
                     
                     const innerEl = c.querySelector('.card-inner-render');
                     if (innerEl) {
-                        innerEl.style.transform = `translateX(${dx}px) rotateY(180deg) scale(0.8)`;
+                        innerEl.style.transform = `translateX(${dx}px) rotateY(0deg) scale(0.8)`;
                         innerEl.style.transition = 'none';
                         
                         innerEl.offsetHeight;
